@@ -1,0 +1,46 @@
+{
+  "_comment": "Baseline strategy - standard risk management",
+  "experiment_name": "baseline",
+  "strategy_name": "Baseline (20% SL/TP)",
+  "description": "Baseline strategy with 20% stop-loss and take-profit",
+
+  "trading": {
+    "max_shares": 10,
+    "share_step": 1,
+    "starting_balance": 100000,
+    "idle_reward": -0.001,
+    "buy_reward_per_share": 0.0,
+    "buy_transaction_cost_per_share": 0.01,
+    "sell_transaction_cost_per_share": 0.01,
+    "stop_loss_pct": 20,
+    "take_profit_pct": 20
+  },
+
+  "network": {
+    "architecture": "dueling",
+    "shared_layers": [256, 128],
+    "value_layers": [128],
+    "advantage_layers": [128],
+    "activation": "relu",
+    "dropout_rate": 0.0,
+    "batch_norm": false
+  },
+
+  "training": {
+    "episodes": 10,
+    "batch_size": 32,
+    "replay_buffer_size": 10000,
+    "target_update_freq": 1,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.01,
+    "epsilon_decay": 0.995,
+    "learning_rate": 0.001,
+    "gamma": 0.99,
+    "optimizer": "adam",
+    "save_frequency": 1,
+    "validation_frequency": 5,
+    "validate_at_episode_1": true,
+    "early_stopping_patience": 10,
+    "early_stopping_metric": "total_return"
+  }
+}

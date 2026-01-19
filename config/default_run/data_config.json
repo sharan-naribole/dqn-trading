@@ -1,0 +1,34 @@
+{
+  "_comment": "Data configuration - shared across all experiments",
+  "ticker": "SPY",
+  "start_date": "2023-01-01",
+  "end_date": "2025-12-31",
+  "data": {
+    "window_size": 2,
+    "normalization_window": 30,
+    "indicators": {
+      "bollinger_period": 20,
+      "bollinger_std": 2,
+      "ema_short": 8,
+      "ema_medium": 21,
+      "sma_short": 50,
+      "sma_long": 100,
+      "adx_period": 14,
+      "rsi_period": 14
+    }
+  },
+  "validation": {
+    "n_periods": 5,
+    "period_unit": "month",
+    "random_seed": 42
+  },
+  "test": {
+    "period_duration": 6,
+    "period_unit": "month"
+  },
+  "output": {
+    "model_dir": "models",
+    "results_dir": "results",
+    "data_dir": "data"
+  }
+}

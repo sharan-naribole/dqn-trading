@@ -1,0 +1,46 @@
+{
+  "_comment": "Quick dry run for testing - minimal settings",
+  "experiment_name": "dry_run",
+  "strategy_name": "Dry Run Test",
+  "description": "Fast validation test - 1 episode, small network",
+
+  "trading": {
+    "max_shares": 1,
+    "share_step": 1,
+    "starting_balance": 10000,
+    "idle_reward": -0.001,
+    "buy_reward_per_share": 0.0,
+    "buy_transaction_cost_per_share": 0.01,
+    "sell_transaction_cost_per_share": 0.01,
+    "stop_loss_pct": 20,
+    "take_profit_pct": 20
+  },
+
+  "network": {
+    "architecture": "dueling",
+    "shared_layers": [128, 64],
+    "value_layers": [32],
+    "advantage_layers": [32],
+    "activation": "relu",
+    "dropout_rate": 0.0,
+    "batch_norm": false
+  },
+
+  "training": {
+    "episodes": 1,
+    "batch_size": 32,
+    "replay_buffer_size": 1000,
+    "target_update_freq": 1,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.01,
+    "epsilon_decay": 0.995,
+    "learning_rate": 0.001,
+    "gamma": 0.99,
+    "optimizer": "adam",
+    "save_frequency": 1,
+    "validation_frequency": 1,
+    "validate_at_episode_1": true,
+    "early_stopping_patience": 0,
+    "early_stopping_metric": "total_return"
+  }
+}
