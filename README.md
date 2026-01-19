@@ -293,7 +293,7 @@ You can add multiple trading strategies to compare:
   "strategy_name": "Aggressive (10% SL, 30% TP)",
   "trading": {
     "max_shares": 100,
-    "share_step": 10,
+    "share_increments": [10, 50, 100],
     "stop_loss_pct": 10,
     "take_profit_pct": 30,
     ...
@@ -306,7 +306,7 @@ You can add multiple trading strategies to compare:
   "strategy_name": "Conservative (30% SL, 10% TP)",
   "trading": {
     "max_shares": 100,
-    "share_step": 10,
+    "share_increments": [10, 50, 100],
     "stop_loss_pct": 30,
     "take_profit_pct": 10,
     ...
@@ -327,22 +327,39 @@ TEST_MODE = False
 
 ### Action Space
 
-The agent's action space is determined by `max_shares` and `share_step` configuration:
+The agent's action space is determined by `max_shares` and `share_increments` configuration:
 
-**Formula:** `n_actions = (max_shares / share_step) + 2`
+**Formula:** `n_actions = 1 + 2*N + 1` where N = len(share_increments)
 
-| max_shares | share_step | Actions | Description |
-|------------|------------|---------|-------------|
-| 10 | 1 | 12 | Hold(0), Buy1(1), Buy2(2)...Buy10(10), Sell(11) |
-| 10 | 2 | 7 | Hold(0), Buy2(1), Buy4(2)...Buy10(5), Sell(6) |
-| 100 | 10 | 12 | Hold(0), Buy10(1), Buy20(2)...Buy100(10), Sell(11) |
-| 100 | 1 | 102 | Hold(0), Buy1(1)...Buy100(100), Sell(101) |
+**Action Structure:**
+- Action 0: HOLD
+- Actions 1 to N: BUY actions (one for each increment)
+- Actions N+1 to 2N: SELL actions (one for each increment)
+- Action 2N+1: SELL_ALL
 
-**Benefits of using share_step > 1:**
-- Dramatically reduces action space (e.g., 102 actions → 12 actions)
-- Faster training convergence
-- Less memory for replay buffer
-- Simpler Q-value learning
+| max_shares | share_increments | Actions | Description |
+|------------|------------------|---------|-------------|
+| 10 | [1, 5, 10] | 8 | HOLD, BUY_1, BUY_5, BUY_10, SELL_1, SELL_5, SELL_10, SELL_ALL |
+| 100 | [10, 50, 100] | 8 | HOLD, BUY_10, BUY_50, BUY_100, SELL_10, SELL_50, SELL_100, SELL_ALL |
+| 100 | [25, 50, 75, 100] | 10 | HOLD + 4 buys + 4 sells + SELL_ALL |
+| 1 | [1] | 4 | HOLD, BUY_1, SELL_1, SELL_ALL |
+
+**Multi-Buy Accumulation:**
+- Agent can buy multiple times, accumulating up to `max_shares`
+- Position tracked with weighted average entry price
+- Guardrails (SL/TP) based on weighted average
+
+**Partial Sells with FIFO:**
+- Agent can sell portions of position (Sell10, Sell50, etc.)
+- Shares removed using FIFO (First-In-First-Out)
+- Profit calculated per-lot
+- SELL_ALL always available when holding shares
+
+**Benefits:**
+- Flexible position sizing through accumulation
+- Realistic trading behavior (scale in/out)
+- Reduced action space vs single-share increments
+- Agent learns strategic position building
 
 ### Trading Rules
 
@@ -597,7 +614,7 @@ The configuration system supports extensive customization of:
   "end_date": "2025-12-31",
   "trading": {
     "max_shares": 10,
-    "share_step": 1,
+    "share_increments": [1, 5, 10],
     "starting_balance": 100000,
     "idle_reward": -0.001,
     "buy_reward_per_share": 0.0,

@@ -108,31 +108,50 @@ Located in `{PROJECT_FOLDER}/trading_*.json`
 
 | Parameter | Type | Default | Description | Range |
 |-----------|------|---------|-------------|-------|
-| `max_shares` | int | 10 | Maximum shares per trade | 1-1000 |
-| `share_step` | int | 1 | Share quantity increment (action space reduction) | 1-100 |
+| `max_shares` | int | 10 | Maximum total shares that can be held | 1-1000 |
+| `share_increments` | list | [1] | List of share quantities for buy/sell actions | [1-max_shares] |
 | `starting_balance` | float | 100000 | Initial cash balance | >0 |
 | `idle_reward` | float | -0.001 | Penalty for holding | -1 to 0 |
 | `buy_reward_per_share` | float | 0.0 | Bonus per share bought | 0-1 |
 | `buy_transaction_cost_per_share` | float | 0.01 | Cost per share bought | 0-1 |
 | `sell_transaction_cost_per_share` | float | 0.01 | Cost per share sold | 0-1 |
-| `stop_loss_pct` | float | 20 | Stop-loss percentage | 0-100 |
-| `take_profit_pct` | float | 20 | Take-profit percentage | 0-10000 |
+| `stop_loss_pct` | float | 20 | Stop-loss percentage (based on weighted avg) | 0-100 |
+| `take_profit_pct` | float | 20 | Take-profit percentage (based on weighted avg) | 0-10000 |
 
-#### Action Space and share_step
+#### Action Space with Multi-Buy and Partial Sells
 
-The `share_step` parameter controls the granularity of buy actions, dramatically reducing the action space:
+The `share_increments` parameter defines the buy/sell action sizes, enabling position accumulation and flexible exits:
 
-**Formula:** `n_actions = (max_shares / share_step) + 2`
+**Formula:** `n_actions = 1 + 2*N + 1` where N = len(share_increments)
+
+**Action Structure:**
+- Action 0: HOLD
+- Actions 1 to N: BUY actions (one per increment)
+- Actions N+1 to 2N: SELL actions (one per increment)
+- Action 2N+1: SELL_ALL
 
 **Examples:**
-- `max_shares=100, share_step=1`: 102 actions (Hold, Buy1-100, Sell)
-- `max_shares=100, share_step=10`: 12 actions (Hold, Buy10, Buy20, ..., Buy100, Sell)
-- `max_shares=100, share_step=25`: 6 actions (Hold, Buy25, Buy50, Buy75, Buy100, Sell)
+- `max_shares=100, share_increments=[10, 50, 100]`: 8 actions (HOLD, BUY_10, BUY_50, BUY_100, SELL_10, SELL_50, SELL_100, SELL_ALL)
+- `max_shares=10, share_increments=[1, 5, 10]`: 8 actions
+- `max_shares=100, share_increments=[25, 50, 75, 100]`: 10 actions
+- `max_shares=1, share_increments=[1]`: 4 actions (HOLD, BUY_1, SELL_1, SELL_ALL)
 
-**When to use larger step sizes:**
-- Large max_shares values (>50) → use step=10 or higher
-- Faster training desired → larger steps reduce complexity
-- Fine-grained control needed → use step=1
+**Multi-Buy Accumulation:**
+- Agent can buy multiple times, accumulating up to `max_shares`
+- Example: BUY_10, then BUY_50, then BUY_10 → holding 70 shares
+- Position tracked with weighted average entry price
+- Guardrails (SL/TP) trigger on weighted average
+
+**Partial Sells with FIFO:**
+- Agent can sell portions: SELL_10, SELL_50, or SELL_ALL
+- Shares sold using FIFO (First-In-First-Out) lot tracking
+- Profit calculated per lot sold
+- SELL_ALL always available when holding any shares
+
+**Choosing share_increments:**
+- Small increments ([1, 2, 5, 10]) → finer control, more actions
+- Large increments ([50, 100]) → faster training, fewer actions
+- Recommended: [10, 50, 100] for max_shares=100
 
 #### Disabling Stop-Loss and Take-Profit
 

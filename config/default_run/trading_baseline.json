@@ -6,7 +6,7 @@
 
   "trading": {
     "max_shares": 10,
-    "share_step": 1,
+    "share_increments": [1, 5, 10],
     "starting_balance": 100000,
     "idle_reward": -0.001,
     "buy_reward_per_share": 0.0,
