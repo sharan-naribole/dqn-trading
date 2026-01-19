@@ -1,19 +1,19 @@
 {
-  "_comment": "Baseline strategy - standard risk management",
-  "experiment_name": "Stop-Loss-Take-Profit-10pct",
-  "strategy_name": "SL/TP 10pct",
-  "description": "Strategy with 10% stop-loss and take-profit",
+  "_comment": "No guardrails strategy - no stop-loss or take-profit",
+  "experiment_name": "no_guardrails",
+  "strategy_name": "No Guardrails",
+  "description": "Pure DQN decision-making without stop-loss or take-profit limits",
 
   "trading": {
     "max_shares": 100,
     "share_increments": [10, 50, 100],
-    "starting_balance": 10000,
+    "starting_balance": 100000,
     "idle_reward": -0.001,
     "buy_reward_per_share": 0.0,
     "buy_transaction_cost_per_share": 0.01,
     "sell_transaction_cost_per_share": 0.01,
-    "stop_loss_pct": 10,
-    "take_profit_pct": 10
+    "stop_loss_pct": 100,
+    "take_profit_pct": 10000
   },
 
   "network": {
@@ -30,7 +30,7 @@
     "episodes": 500,
     "batch_size": 64,
     "replay_buffer_size": 10000,
-    "target_update_freq": 1,
+    "target_update_freq": 5,
     "epsilon_start": 1.0,
     "epsilon_end": 0.01,
     "epsilon_decay": 0.995,

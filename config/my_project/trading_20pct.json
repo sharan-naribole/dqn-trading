@@ -7,7 +7,7 @@
   "trading": {
     "max_shares": 100,
     "share_increments": [10, 50, 100],
-    "starting_balance": 10000,
+    "starting_balance": 100000,
     "idle_reward": -0.001,
     "buy_reward_per_share": 0.0,
     "buy_transaction_cost_per_share": 0.01,
@@ -30,7 +30,7 @@
     "episodes": 500,
     "batch_size": 64,
     "replay_buffer_size": 10000,
-    "target_update_freq": 1,
+    "target_update_freq": 5,
     "epsilon_start": 1.0,
     "epsilon_end": 0.01,
     "epsilon_decay": 0.995,
