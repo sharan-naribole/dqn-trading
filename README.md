@@ -2,6 +2,10 @@
 
 A professional implementation of Deep Q-Network (DQN) for stock trading with Double DQN, Dueling architecture, intelligent position sizing, and comprehensive risk management.
 
+## ⚠️ Disclaimer
+
+**This project is for educational and research purposes only.** The code and strategies presented should not be considered financial advice, investment advice, or trading advice. Trading stocks and financial instruments involves substantial risk of loss and is not suitable for every investor. Past performance of backtested strategies does not guarantee future results. The author is not responsible for any financial losses incurred from using this code. Always consult with a qualified financial advisor before making investment decisions.
+
 ## Table of Contents
 
 1. [Executive Summary](#executive-summary)
