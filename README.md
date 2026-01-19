@@ -792,7 +792,7 @@ The trained models were evaluated on **5 randomly selected out-of-sample validat
 
 These validation periods were **never seen during training** and represent diverse market conditions including bull markets, bear markets, high volatility, and recovery phases.
 
-![Out-of-Sample Validation Comparison](results/my-project/run_20260118_215254/validation_comparison.png)
+![Out-of-Sample Validation Comparison](docs/images/sample-validation-comparison.png)
 
 **Key Observations:**
 - **2008 Financial Crisis:** The 10% SL/TP strategy showed resilience with positive returns (+0.64%) by taking profits early, while the No Guardrails strategy suffered significant losses (-1.04%)
