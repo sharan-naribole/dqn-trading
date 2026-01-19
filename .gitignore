@@ -1,0 +1,47 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+.pytest_cache/
+
+# Project specific - Generated data
+data/
+*.csv
+*.h5
+
+# Project specific - Training artifacts
+logs/
+models/
+*.log
+
+# Project specific - Results (except documentation images)
+results/
+!results/my-project/
+!results/my-project/run_20260118_215254/
+!results/my-project/run_20260118_215254/validation_comparison.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
