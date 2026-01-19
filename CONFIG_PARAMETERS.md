@@ -108,8 +108,8 @@ Located in `{PROJECT_FOLDER}/trading_*.json`
 
 | Parameter | Type | Default | Description | Range |
 |-----------|------|---------|-------------|-------|
-| `max_shares` | int | 10 | Maximum total shares that can be held | 1-1000 |
-| `share_increments` | list | [1] | List of share quantities for buy/sell actions | [1-max_shares] |
+| `share_increments` | list | [1] | List of share quantities for buy/sell actions | Any positive integers |
+| `enable_buy_max` | bool | true | Enable BUY_MAX action (buy all affordable shares) | true/false |
 | `starting_balance` | float | 100000 | Initial cash balance | >0 |
 | `idle_reward` | float | -0.001 | Penalty for holding | -1 to 0 |
 | `buy_reward_per_share` | float | 0.0 | Bonus per share bought | 0-1 |
@@ -118,29 +118,50 @@ Located in `{PROJECT_FOLDER}/trading_*.json`
 | `stop_loss_pct` | float | 20 | Stop-loss percentage (based on weighted avg) | 0-100 |
 | `take_profit_pct` | float | 20 | Take-profit percentage (based on weighted avg) | 0-10000 |
 
-#### Action Space with Multi-Buy and Partial Sells
+#### Action Space with BUY_MAX, Multi-Buy and Partial Sells
 
-The `share_increments` parameter defines the buy/sell action sizes, enabling position accumulation and flexible exits:
+The `share_increments` and `enable_buy_max` parameters define the action space:
 
-**Formula:** `n_actions = 1 + 2*N + 1` where N = len(share_increments)
+**Formula (with BUY_MAX enabled):** `n_actions = 1 + N + 1 + N + 1` where N = len(share_increments)
 
-**Action Structure:**
+**Formula (with BUY_MAX disabled):** `n_actions = 1 + N + N + 1` where N = len(share_increments)
+
+**Action Structure (BUY_MAX enabled):**
+- Action 0: HOLD
+- Actions 1 to N: BUY actions (one per increment)
+- Action N+1: BUY_MAX (buy as many shares as balance allows)
+- Actions N+2 to 2N+1: SELL actions (one per increment)
+- Action 2N+2: SELL_ALL
+
+**Action Structure (BUY_MAX disabled):**
 - Action 0: HOLD
 - Actions 1 to N: BUY actions (one per increment)
 - Actions N+1 to 2N: SELL actions (one per increment)
 - Action 2N+1: SELL_ALL
 
 **Examples:**
-- `max_shares=100, share_increments=[10, 50, 100]`: 8 actions (HOLD, BUY_10, BUY_50, BUY_100, SELL_10, SELL_50, SELL_100, SELL_ALL)
-- `max_shares=10, share_increments=[1, 5, 10]`: 8 actions
-- `max_shares=100, share_increments=[25, 50, 75, 100]`: 10 actions
-- `max_shares=1, share_increments=[1]`: 4 actions (HOLD, BUY_1, SELL_1, SELL_ALL)
+
+| share_increments | enable_buy_max | Actions | Description |
+|------------------|----------------|---------|-------------|
+| [1] | true | 4 | HOLD, BUY_1, BUY_MAX, SELL_1, SELL_ALL |
+| [1] | false | 3 | HOLD, BUY_1, SELL_1, SELL_ALL |
+| [1, 5, 10] | true | 9 | HOLD, BUY_1, BUY_5, BUY_10, BUY_MAX, SELL_1, SELL_5, SELL_10, SELL_ALL |
+| [1, 5, 10] | false | 8 | HOLD, BUY_1, BUY_5, BUY_10, SELL_1, SELL_5, SELL_10, SELL_ALL |
+| [10, 50, 100] | true | 9 | HOLD + 3 buys + BUY_MAX + 3 sells + SELL_ALL |
+| [10, 50, 100] | false | 8 | HOLD + 3 buys + 3 sells + SELL_ALL |
+
+**BUY_MAX Action:**
+- Buys as many shares as the current balance allows: `shares = int(balance / current_price)`
+- Price-adaptive: At $400 vs $500, BUY_MAX buys different quantities
+- No arbitrary position limits
+- Symmetric to SELL_ALL action
+- Can be disabled by setting `enable_buy_max: false`
 
 **Multi-Buy Accumulation:**
-- Agent can buy multiple times, accumulating up to `max_shares`
-- Example: BUY_10, then BUY_50, then BUY_10 → holding 70 shares
+- Agent can buy multiple times using increments or BUY_MAX
+- Example: BUY_10, then BUY_MAX, then BUY_50 → accumulating position
 - Position tracked with weighted average entry price
-- Guardrails (SL/TP) trigger on weighted average
+- Guardrails (SL/TP) trigger based on weighted average
 
 **Partial Sells with FIFO:**
 - Agent can sell portions: SELL_10, SELL_50, or SELL_ALL
@@ -149,9 +170,10 @@ The `share_increments` parameter defines the buy/sell action sizes, enabling pos
 - SELL_ALL always available when holding any shares
 
 **Choosing share_increments:**
-- Small increments ([1, 2, 5, 10]) → finer control, more actions
-- Large increments ([50, 100]) → faster training, fewer actions
-- Recommended: [10, 50, 100] for max_shares=100
+- Small increments ([1, 5, 10]) → finer control, more actions
+- Large increments ([10, 50, 100]) → faster training, fewer actions
+- Recommended: [10, 50, 100] for most use cases
+- BUY_MAX adds flexibility without increasing training complexity significantly
 
 #### Disabling Stop-Loss and Take-Profit
 
@@ -280,7 +302,8 @@ Located in `trading_*.json` under `training` key.
   "description": "Fast validation test - 1 episode, small network",
 
   "trading": {
-    "max_shares": 1,
+    "share_increments": [1],
+    "enable_buy_max": true,
     "starting_balance": 10000,
     "idle_reward": -0.001,
     "buy_reward_per_share": 0.0,
@@ -331,7 +354,8 @@ Located in `trading_*.json` under `training` key.
   "description": "Baseline strategy with 20% stop-loss and take-profit",
 
   "trading": {
-    "max_shares": 10,
+    "share_increments": [1, 5, 10],
+    "enable_buy_max": true,
     "starting_balance": 100000,
     "idle_reward": -0.001,
     "buy_reward_per_share": 0.0,
@@ -382,7 +406,8 @@ Located in `trading_*.json` under `training` key.
   "description": "Pure DQN decision-making without stop-loss or take-profit limits",
 
   "trading": {
-    "max_shares": 10,
+    "share_increments": [1, 5, 10],
+    "enable_buy_max": true,
     "starting_balance": 100000,
     "idle_reward": -0.001,
     "buy_reward_per_share": 0.0,

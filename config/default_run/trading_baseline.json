@@ -5,8 +5,8 @@
   "description": "Baseline strategy with 20% stop-loss and take-profit",
 
   "trading": {
-    "max_shares": 10,
     "share_increments": [1, 5, 10],
+    "enable_buy_max": true,
     "starting_balance": 100000,
     "idle_reward": -0.001,
     "buy_reward_per_share": 0.0,

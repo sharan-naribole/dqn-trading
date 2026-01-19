@@ -255,9 +255,12 @@ class ModelManager:
         end = config['end_date']
         episodes = config['training']['episodes']
         window = config['data']['window_size']
-        max_shares = config['trading']['max_shares']
+        share_increments = config['trading']['share_increments']
 
-        return f"{ticker}_{start}_{end}_ep{episodes}_ws{window}_ms{max_shares}"
+        # Create compact representation of share_increments
+        increments_str = '_'.join(map(str, share_increments))
+
+        return f"{ticker}_{start}_{end}_ep{episodes}_ws{window}_si{increments_str}"
 
     def _load_metadata(self, model_dir: str) -> Optional[Dict[str, Any]]:
         """Load metadata from model directory."""

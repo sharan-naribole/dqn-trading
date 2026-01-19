@@ -5,8 +5,8 @@
   "description": "Fast validation test - 1 episode, small network",
 
   "trading": {
-    "max_shares": 1,
     "share_increments": [1],
+    "enable_buy_max": true,
     "starting_balance": 10000,
     "idle_reward": -0.001,
     "buy_reward_per_share": 0.0,

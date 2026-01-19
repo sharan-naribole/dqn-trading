@@ -51,8 +51,11 @@ class ConfigLoader:
 
         # Validate trading parameters if present
         if 'trading' in self.config:
-            if self.config['trading']['max_shares'] < 1:
-                raise ValueError("max_shares must be at least 1")
+            if 'share_increments' in self.config['trading']:
+                if not self.config['trading']['share_increments']:
+                    raise ValueError("share_increments cannot be empty")
+                if any(inc <= 0 for inc in self.config['trading']['share_increments']):
+                    raise ValueError("All share_increments must be positive")
 
             if self.config['trading']['starting_balance'] <= 0:
                 raise ValueError("starting_balance must be positive")
@@ -84,7 +87,7 @@ class ConfigLoader:
         Get configuration value by key (supports nested keys with dots).
 
         Args:
-            key: Configuration key (e.g., 'trading.max_shares')
+            key: Configuration key (e.g., 'trading.share_increments')
             default: Default value if key not found
 
         Returns:
@@ -106,7 +109,7 @@ class ConfigLoader:
         Update configuration value.
 
         Args:
-            key: Configuration key (e.g., 'trading.max_shares')
+            key: Configuration key (e.g., 'trading.share_increments')
             value: New value
         """
         keys = key.split('.')
@@ -158,7 +161,6 @@ class ConfigLoader:
             'end_date': 'end_date',
             'mode': 'mode',
             'episodes': 'training.episodes',
-            'max_shares': 'trading.max_shares',
             'window_size': 'data.window_size',
         }
 
@@ -180,6 +182,9 @@ class ConfigLoader:
         end = self.config['end_date']
         episodes = self.config['training']['episodes']
         window = self.config['data']['window_size']
-        max_shares = self.config['trading']['max_shares']
+        share_increments = self.config['trading']['share_increments']
 
-        return f"{ticker}_{start}_{end}_ep{episodes}_ws{window}_ms{max_shares}"
+        # Create compact representation of share_increments
+        increments_str = '_'.join(map(str, share_increments))
+
+        return f"{ticker}_{start}_{end}_ep{episodes}_ws{window}_si{increments_str}"

@@ -12,48 +12,59 @@ class ActionMasker:
     Action Structure:
     - Action 0: HOLD
     - Actions 1 to N: BUY actions (one for each share_increment)
-    - Actions N+1 to 2N: SELL actions (one for each share_increment)
-    - Action 2N+1: SELL_ALL
+    - Action N+1: BUY_MAX (buy as many shares as balance allows)
+    - Actions N+2 to 2N+1: SELL actions (one for each share_increment)
+    - Action 2N+2: SELL_ALL
 
     Example with share_increments=[10, 50, 100]:
     - 0: HOLD
     - 1: BUY_10, 2: BUY_50, 3: BUY_100
-    - 4: SELL_10, 5: SELL_50, 6: SELL_100
-    - 7: SELL_ALL
-    Total: 8 actions
+    - 4: BUY_MAX
+    - 5: SELL_10, 6: SELL_50, 7: SELL_100
+    - 8: SELL_ALL
+    Total: 9 actions
     """
 
-    def __init__(self, max_shares: int, share_increments: List[int]):
+    def __init__(self, share_increments: List[int], enable_buy_max: bool = True):
         """
         Initialize action masker with share increments.
 
         Args:
-            max_shares: Maximum total shares that can be held
             share_increments: List of share quantities for buy/sell actions
                              Example: [10, 50, 100]
+            enable_buy_max: Whether to enable BUY_MAX action (default: True)
         """
-        self.max_shares = max_shares
         self.share_increments = sorted(share_increments)  # Ensure sorted
+        self.enable_buy_max = enable_buy_max
 
         # Validate increments
         if not share_increments:
             raise ValueError("share_increments cannot be empty")
         if any(inc <= 0 for inc in share_increments):
             raise ValueError("All share_increments must be positive")
-        if max(share_increments) > max_shares:
-            raise ValueError(f"Max increment {max(share_increments)} exceeds max_shares {max_shares}")
 
         # Calculate action space
         n_increments = len(share_increments)
         self.n_buy_actions = n_increments
         self.n_sell_actions = n_increments
-        self.n_actions = 1 + n_increments + n_increments + 1  # HOLD + BUYs + SELLs + SELL_ALL
+
+        if enable_buy_max:
+            self.n_actions = 1 + n_increments + 1 + n_increments + 1  # HOLD + BUYs + BUY_MAX + SELLs + SELL_ALL
+        else:
+            self.n_actions = 1 + n_increments + n_increments + 1  # HOLD + BUYs + SELLs + SELL_ALL
 
         # Action indices
         self.HOLD = 0
         self.BUY_ACTIONS = list(range(1, 1 + n_increments))
-        self.SELL_ACTIONS = list(range(1 + n_increments, 1 + 2*n_increments))
-        self.SELL_ALL = 1 + 2*n_increments
+
+        if enable_buy_max:
+            self.BUY_MAX = 1 + n_increments
+            self.SELL_ACTIONS = list(range(self.BUY_MAX + 1, self.BUY_MAX + 1 + n_increments))
+            self.SELL_ALL = self.BUY_MAX + 1 + n_increments
+        else:
+            self.BUY_MAX = None
+            self.SELL_ACTIONS = list(range(1 + n_increments, 1 + 2*n_increments))
+            self.SELL_ALL = 1 + 2*n_increments
 
         # Mapping from action index to share quantity
         self.action_to_shares_map = {}
@@ -65,6 +76,8 @@ class ActionMasker:
             self.action_to_shares_map[buy_action] = shares
             self.action_to_shares_map[sell_action] = shares
 
+        if enable_buy_max:
+            self.action_to_shares_map[self.BUY_MAX] = -2  # Special: buy max
         self.action_to_shares_map[self.SELL_ALL] = -1  # Special: sell all
 
     def get_action_mask(
@@ -91,15 +104,16 @@ class ActionMasker:
         # HOLD is always valid
         mask[self.HOLD] = True
 
-        # BUY actions - valid if can afford AND won't exceed max_shares
+        # BUY actions - valid if can afford
         for i, shares in enumerate(self.share_increments):
             buy_action = self.BUY_ACTIONS[i]
+            required_balance = shares * current_price
+            if current_balance - required_balance >= min_balance:
+                mask[buy_action] = True
 
-            # Check if buying this amount would exceed max_shares
-            if current_position + shares <= self.max_shares:
-                required_balance = shares * current_price
-                if current_balance - required_balance >= min_balance:
-                    mask[buy_action] = True
+        # BUY_MAX - valid if enabled and can afford at least 1 share
+        if self.enable_buy_max and current_balance - current_price >= min_balance:
+            mask[self.BUY_MAX] = True
 
         # SELL actions - valid only if have enough shares to sell
         if current_position > 0:
@@ -170,13 +184,15 @@ class ActionMasker:
         Returns:
             Number of shares
             - Positive: shares to buy
-            - Negative: shares to sell (-1 means sell all)
+            - Negative: shares to sell (-1 means sell all, -2 means buy max)
             - Zero: hold
         """
         if action == self.HOLD:
             return 0
         elif action in self.BUY_ACTIONS:
             return self.action_to_shares_map[action]
+        elif self.enable_buy_max and action == self.BUY_MAX:
+            return -2  # Special: buy max
         elif action in self.SELL_ACTIONS:
             return -self.action_to_shares_map[action]  # Negative for sells
         elif action == self.SELL_ALL:
@@ -186,7 +202,10 @@ class ActionMasker:
 
     def is_buy_action(self, action: int) -> bool:
         """Check if action is a buy action."""
-        return action in self.BUY_ACTIONS
+        if self.enable_buy_max:
+            return action in self.BUY_ACTIONS or action == self.BUY_MAX
+        else:
+            return action in self.BUY_ACTIONS
 
     def is_sell_action(self, action: int) -> bool:
         """Check if action is a sell action (including SELL_ALL)."""
@@ -204,6 +223,8 @@ class ActionMasker:
         """
         if action == self.HOLD:
             return "HOLD"
+        elif self.enable_buy_max and action == self.BUY_MAX:
+            return "BUY_MAX"
         elif action == self.SELL_ALL:
             return "SELL_ALL"
         elif action in self.BUY_ACTIONS:
@@ -325,8 +346,8 @@ class ActionMasker:
         lines = [
             f"Action Space Summary:",
             f"  Total actions: {self.n_actions}",
-            f"  Max shares: {self.max_shares}",
             f"  Share increments: {self.share_increments}",
+            f"  BUY_MAX enabled: {self.enable_buy_max}",
             f"",
             f"Action Mapping:",
             f"  {self.HOLD}: HOLD"
@@ -335,6 +356,9 @@ class ActionMasker:
         for i, shares in enumerate(self.share_increments):
             buy_action = self.BUY_ACTIONS[i]
             lines.append(f"  {buy_action}: BUY_{shares}")
+
+        if self.enable_buy_max:
+            lines.append(f"  {self.BUY_MAX}: BUY_MAX")
 
         for i, shares in enumerate(self.share_increments):
             sell_action = self.SELL_ACTIONS[i]

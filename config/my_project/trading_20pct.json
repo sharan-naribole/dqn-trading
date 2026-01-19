@@ -5,8 +5,8 @@
   "description": "Strategy with 20% stop-loss and take-profit",
 
   "trading": {
-    "max_shares": 100,
     "share_increments": [10, 50, 100],
+    "enable_buy_max": true,
     "starting_balance": 100000,
     "idle_reward": -0.001,
     "buy_reward_per_share": 0.0,

@@ -20,7 +20,7 @@ class TradingEnvironment:
     Trading environment with action masking and guardrails.
 
     This environment simulates stock trading with:
-    - Multi-buy accumulation (multiple buys up to max_shares)
+    - Multi-buy accumulation (BUY_MAX or incremental buys)
     - Partial sells with FIFO lot tracking
     - Action masking to prevent invalid trades
     - Stop-loss and take-profit guardrails (based on weighted average)
@@ -56,7 +56,6 @@ class TradingEnvironment:
             config (Dict): Configuration dictionary containing:
                 - ticker: Stock symbol
                 - data.window_size: Lookback window for state
-                - trading.max_shares: Maximum total shares that can be held
                 - trading.share_increments: List of share quantities for buy/sell
                   (e.g., [10, 50, 100])
                 - trading.starting_balance: Initial capital
@@ -77,7 +76,6 @@ class TradingEnvironment:
         # Extract configuration
         self.ticker = config['ticker']
         self.window_size = config['data']['window_size']
-        self.max_shares = config['trading']['max_shares']
 
         # Support both share_increments (new) and share_step (legacy)
         if 'share_increments' in config['trading']:
@@ -85,15 +83,16 @@ class TradingEnvironment:
         elif 'share_step' in config['trading']:
             # Legacy: convert share_step to share_increments
             step = config['trading']['share_step']
-            self.share_increments = list(range(step, self.max_shares + 1, step))
+            self.share_increments = [step]
         else:
             # Default: single share increments
             self.share_increments = [1]
 
         self.starting_balance = config['trading']['starting_balance']
+        self.enable_buy_max = config['trading'].get('enable_buy_max', True)
 
         # Initialize components
-        self.action_masker = ActionMasker(self.max_shares, self.share_increments)
+        self.action_masker = ActionMasker(self.share_increments, self.enable_buy_max)
         self.guardrails = TradingGuardrails(
             stop_loss_pct=config['trading']['stop_loss_pct'],
             take_profit_pct=config['trading']['take_profit_pct'],
@@ -160,8 +159,9 @@ class TradingEnvironment:
             action (int): Action to execute
                 - 0: HOLD
                 - 1 to N: BUY actions (one for each share_increment)
-                - N+1 to 2N: SELL actions (one for each share_increment)
-                - 2N+1: SELL_ALL
+                - N+1: BUY_MAX
+                - N+2 to 2N+1: SELL actions (one for each share_increment)
+                - 2N+2: SELL_ALL
 
         Returns:
             Tuple[np.ndarray, float, bool, Dict]:
@@ -223,7 +223,7 @@ class TradingEnvironment:
         Execute trading action and return reward.
 
         Supports:
-        - Multiple buys (accumulation up to max_shares)
+        - Multiple buys (BUY_MAX or incremental buys)
         - Partial sells (FIFO lot tracking)
         - Sell all
 
@@ -245,6 +245,10 @@ class TradingEnvironment:
             # Buy shares (may be adding to existing position)
             shares_to_buy = self.action_masker.action_to_shares(action)
 
+            # Handle BUY_MAX action
+            if self.enable_buy_max and action == self.action_masker.BUY_MAX:
+                shares_to_buy = int(self.balance / current_price)
+
             new_balance, cost, success = self.guardrails.execute_buy(
                 shares_to_buy, current_price, self.balance
             )
@@ -255,9 +259,13 @@ class TradingEnvironment:
                 self.total_shares_traded += shares_to_buy
 
                 # Record trade
+                action_name = 'BUY'
+                if self.enable_buy_max and action == self.action_masker.BUY_MAX:
+                    action_name = 'BUY_MAX'
+
                 self.trades.append({
                     'step': self.current_step,
-                    'action': 'BUY',
+                    'action': action_name,
                     'shares': shares_to_buy,
                     'price': current_price,
                     'cost': cost,
@@ -277,7 +285,7 @@ class TradingEnvironment:
 
                 reward = buy_reward + transaction_penalty
             else:
-                # Failed to buy (insufficient balance or would exceed max_shares)
+                # Failed to buy (insufficient balance)
                 reward = -1
 
         elif self.action_masker.is_sell_action(action):
@@ -421,8 +429,12 @@ class TradingEnvironment:
         state_data = self.data.iloc[start_idx:end_idx][self.feature_columns].values
 
         # Add position information to state
+        # Normalize position by estimating max affordable shares with starting balance
+        current_price = self._get_current_price()
+        max_affordable_shares = self.starting_balance / current_price if current_price > 0 else 1
+
         position_info = np.array([
-            self.shares_held / self.max_shares,  # Normalized position
+            self.shares_held / max_affordable_shares,  # Normalized position
             self.balance / self.starting_balance,  # Normalized balance
         ])
 
@@ -535,7 +547,7 @@ class TradingEnvironment:
         win_rate = len(winning_trades) / max(len(self.trades), 1)
 
         # Position sizing statistics (CRITICAL for understanding agent's learning!)
-        buy_trades = [t for t in self.trades if t.get('action') == 'BUY']
+        buy_trades = [t for t in self.trades if t.get('action') in ['BUY', 'BUY_MAX']]
         if buy_trades:
             shares_bought = [t.get('shares', 0) for t in buy_trades]
             avg_position_size = np.mean(shares_bought)
@@ -545,10 +557,10 @@ class TradingEnvironment:
 
             # Position size distribution (histogram)
             position_size_dist = {}
-            for i in range(1, self.max_shares + 1):
-                count = sum(1 for s in shares_bought if s == i)
-                if count > 0:
-                    position_size_dist[f'{i}_shares'] = count
+            unique_sizes = sorted(set(shares_bought))
+            for size in unique_sizes:
+                count = sum(1 for s in shares_bought if s == size)
+                position_size_dist[f'{size}_shares'] = count
         else:
             avg_position_size = 0.0
             min_position_size = 0

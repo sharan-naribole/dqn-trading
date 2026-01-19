@@ -28,21 +28,21 @@ A professional implementation of Deep Q-Network (DQN) for stock trading with Dou
 ## Executive Summary
 
 ### What This System Does
-This system trains an AI agent to make stock trading decisions (Buy/Hold/Sell) with variable position sizing (1-N shares) using Deep Reinforcement Learning. The agent learns to maximize absolute profit while managing risk through stop-loss and take-profit mechanisms.
+This system trains an AI agent to make stock trading decisions (Buy/Hold/Sell) with flexible position sizing using Deep Reinforcement Learning. The agent learns to maximize absolute profit while managing risk through stop-loss and take-profit mechanisms.
 
 ### Key Differentiators
 - **Absolute Profit Rewards**: Unlike naive implementations using percentage returns, our reward function uses absolute profit to properly incentivize position sizing
-- **Variable Position Sizing**: Agent learns to buy 1 to MAX_SHARES based on market conditions
+- **BUY_MAX Action**: Price-adaptive position sizing - agent can go "all-in" based on available balance, no arbitrary limits
 - **Smart Data Caching**: Intelligent caching system prevents redundant API calls
 - **Production Quality**: Comprehensive monitoring, logging, and configuration management
 
 ### Core Capabilities
 | Feature | Description |
 |---------|-------------|
-| **Position Sizing** | Buy 1 to N shares per trade (configurable) |
+| **Position Sizing** | Flexible position sizing with BUY_MAX and incremental buys |
 | **Risk Management** | Stop-loss (20%) and take-profit (20%) guardrails |
 | **Architecture** | Double DQN with Dueling networks |
-| **Action Masking** | Prevents invalid actions (can't buy when holding) |
+| **Action Masking** | Prevents invalid actions (insufficient balance, etc.) |
 | **Data Features** | 25+ technical indicators with rolling normalization |
 | **Validation** | Out-of-sample validation on random non-overlapping periods |
 
@@ -175,7 +175,7 @@ Each project folder contains:
   "experiment_name": "baseline",
   "strategy_name": "Baseline (20% SL/TP)",  // Used in plot legends
   "trading": {
-    "max_shares": 10,
+    "share_increments": [1, 5, 10],
     "starting_balance": 100000,
     "stop_loss_pct": 20,
     "take_profit_pct": 20
@@ -296,7 +296,6 @@ You can add multiple trading strategies to compare:
   "experiment_name": "aggressive",
   "strategy_name": "Aggressive (10% SL, 30% TP)",
   "trading": {
-    "max_shares": 100,
     "share_increments": [10, 50, 100],
     "stop_loss_pct": 10,
     "take_profit_pct": 30,
@@ -309,7 +308,6 @@ You can add multiple trading strategies to compare:
   "experiment_name": "conservative",
   "strategy_name": "Conservative (30% SL, 10% TP)",
   "trading": {
-    "max_shares": 100,
     "share_increments": [10, 50, 100],
     "stop_loss_pct": 30,
     "take_profit_pct": 10,
@@ -331,25 +329,34 @@ TEST_MODE = False
 
 ### Action Space
 
-The agent's action space is determined by `max_shares` and `share_increments` configuration:
+The agent's action space is determined by `share_increments` configuration:
 
-**Formula:** `n_actions = 1 + 2*N + 1` where N = len(share_increments)
+**Formula:** `n_actions = 1 + N + 1 + N + 1` where N = len(share_increments)
 
 **Action Structure:**
 - Action 0: HOLD
 - Actions 1 to N: BUY actions (one for each increment)
-- Actions N+1 to 2N: SELL actions (one for each increment)
-- Action 2N+1: SELL_ALL
+- Action N+1: BUY_MAX (buy as many shares as balance allows)
+- Actions N+2 to 2N+1: SELL actions (one for each increment)
+- Action 2N+2: SELL_ALL
 
-| max_shares | share_increments | Actions | Description |
-|------------|------------------|---------|-------------|
-| 10 | [1, 5, 10] | 8 | HOLD, BUY_1, BUY_5, BUY_10, SELL_1, SELL_5, SELL_10, SELL_ALL |
-| 100 | [10, 50, 100] | 8 | HOLD, BUY_10, BUY_50, BUY_100, SELL_10, SELL_50, SELL_100, SELL_ALL |
-| 100 | [25, 50, 75, 100] | 10 | HOLD + 4 buys + 4 sells + SELL_ALL |
-| 1 | [1] | 4 | HOLD, BUY_1, SELL_1, SELL_ALL |
+| share_increments | Actions | Description |
+|------------------|---------|-------------|
+| [1] | 4 | HOLD, BUY_1, BUY_MAX, SELL_1, SELL_ALL |
+| [1, 5, 10] | 9 | HOLD, BUY_1, BUY_5, BUY_10, BUY_MAX, SELL_1, SELL_5, SELL_10, SELL_ALL |
+| [10, 50, 100] | 9 | HOLD, BUY_10, BUY_50, BUY_100, BUY_MAX, SELL_10, SELL_50, SELL_100, SELL_ALL |
+| [25, 50, 75, 100] | 11 | HOLD + 4 buys + BUY_MAX + 4 sells + SELL_ALL |
+
+**Key Features:**
+
+**BUY_MAX Action:**
+- Buys as many shares as the current balance allows
+- Adaptive to price changes (at $400 vs $500, different quantities)
+- No arbitrary position size limits
+- Natural capital allocation
 
 **Multi-Buy Accumulation:**
-- Agent can buy multiple times, accumulating up to `max_shares`
+- Agent can buy multiple times using increments or BUY_MAX
 - Position tracked with weighted average entry price
 - Guardrails (SL/TP) based on weighted average
 
@@ -360,9 +367,10 @@ The agent's action space is determined by `max_shares` and `share_increments` co
 - SELL_ALL always available when holding shares
 
 **Benefits:**
-- Flexible position sizing through accumulation
+- No arbitrary max_shares constraint
+- Price-adaptive position sizing
+- Symmetric design (BUY_MAX mirrors SELL_ALL)
 - Realistic trading behavior (scale in/out)
-- Reduced action space vs single-share increments
 - Agent learns strategic position building
 
 ### Trading Rules
@@ -381,7 +389,7 @@ The agent's action space is determined by `max_shares` and `share_increments` co
    ```python
    State Shape: (window_size, n_features + 2)
    - Features: 25 technical indicators (normalized)
-   - Position: shares_held / max_shares
+   - Position: shares_held / max_affordable_shares
    - Balance: current_balance / starting_balance
    ```
 
@@ -617,7 +625,6 @@ The configuration system supports extensive customization of:
   "start_date": "2016-01-01",
   "end_date": "2025-12-31",
   "trading": {
-    "max_shares": 10,
     "share_increments": [1, 5, 10],
     "starting_balance": 100000,
     "idle_reward": -0.001,
@@ -755,7 +762,7 @@ python monitor_training.py
 📊 Configuration:
   • Ticker: SPY
   • Episodes: 100
-  • Max Shares: 10
+  • Share Increments: [1, 5, 10]
 
 ⏱️  Runtime: 25.7 minutes
 📈 Episode 67/100 (67.0%)
@@ -793,7 +800,7 @@ This example demonstrates training DQN agents on SPY (S&P 500 ETF) with three di
 - **Data Period:** 2005-2025 (21 years)
 - **Training Data:** 2006-2024 (~19 years)
 - **Starting Capital:** $10,000
-- **Max Shares:** 100 shares per trade
+- **Share Increments:** [10, 50, 100]
 - **Training Episodes:** 500 per strategy
 
 **Three Strategies Compared:**
@@ -889,7 +896,7 @@ The system outputs comprehensive metrics:
 ```json
 {
   "trading": {
-    "max_shares": 2,
+    "share_increments": [1],
     "stop_loss_pct": 0.10,
     "take_profit_pct": 0.15,
     "idle_reward": -0.002,
@@ -902,7 +909,7 @@ The system outputs comprehensive metrics:
 ```json
 {
   "trading": {
-    "max_shares": 50,
+    "share_increments": [10, 50, 100],
     "stop_loss_pct": 0.30,
     "take_profit_pct": 0.40,
     "idle_reward": 0.0,

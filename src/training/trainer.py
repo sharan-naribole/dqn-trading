@@ -583,7 +583,14 @@ class DQNTrainer:
         # Initialize DQN if not already done
         if self.dqn is None:
             state_shape = metadata['config']['data']['window_size']
-            n_actions = metadata['config']['trading']['max_shares'] + 2
+            # Calculate n_actions from share_increments and enable_buy_max
+            share_increments = metadata['config']['trading']['share_increments']
+            enable_buy_max = metadata['config']['trading'].get('enable_buy_max', True)
+            n_increments = len(share_increments)
+            if enable_buy_max:
+                n_actions = 1 + n_increments + 1 + n_increments + 1  # HOLD + BUYs + BUY_MAX + SELLs + SELL_ALL
+            else:
+                n_actions = 1 + n_increments + n_increments + 1  # HOLD + BUYs + SELLs + SELL_ALL
             self.initialize_model((state_shape,), n_actions)
 
         # Load weights
