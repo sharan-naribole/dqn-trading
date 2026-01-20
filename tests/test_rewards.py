@@ -81,17 +81,18 @@ class TestRewardCalculation:
 
         current_price = self.env._get_current_price()
 
-        # Sell at higher price
-        _, sell_reward, _, _ = self.env.step(self.env.action_masker.SELL)
+        # Sell at higher price (use first sell action)
+        _, sell_reward, _, _ = self.env.step(self.env.action_masker.SELL_ACTIONS[0])
 
-        # Reward should be positive (net profit as %)
-        # Formula: (net_profit / position_value) * 100
+        # Reward should be positive (log return)
+        # Formula: log(1 + net_profit / position_value) * 100
         gross_profit = current_price - entry_price
         buy_cost = self.config['trading']['buy_transaction_cost_per_share']
         sell_cost = self.config['trading']['sell_transaction_cost_per_share']
         net_profit = gross_profit - (buy_cost + sell_cost)
 
-        expected_reward = (net_profit / entry_price) * 100
+        simple_return = net_profit / entry_price
+        expected_reward = np.log(1 + simple_return) * 100
 
         if current_price > entry_price:
             assert sell_reward > 0, "Profitable trade should have positive reward"
@@ -130,8 +131,8 @@ class TestRewardCalculation:
 
         current_price = env._get_current_price()
 
-        # Sell at lower price
-        _, sell_reward, _, _ = env.step(env.action_masker.SELL)
+        # Sell at lower price (use first sell action)
+        _, sell_reward, _, _ = env.step(env.action_masker.SELL_ACTIONS[0])
 
         # Reward should be negative
         if current_price < entry_price:
@@ -173,8 +174,8 @@ class TestRewardCalculation:
         """Test that invalid SELL (no shares) gives idle reward."""
         self.env.reset()
 
-        # Try to sell without holding
-        _, reward, _, info = self.env.step(self.env.action_masker.SELL)
+        # Try to sell without holding (use first sell action)
+        _, reward, _, info = self.env.step(self.env.action_masker.SELL_ACTIONS[0])
 
         # Action masking converts invalid sell to HOLD, so get idle_reward
         assert reward == self.config['trading']['idle_reward']

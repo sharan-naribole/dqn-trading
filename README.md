@@ -31,7 +31,7 @@ A professional implementation of Deep Q-Network (DQN) for stock trading with Dou
 This system trains an AI agent to make stock trading decisions (Buy/Hold/Sell) with flexible position sizing using Deep Reinforcement Learning. The agent learns to maximize absolute profit while managing risk through stop-loss and take-profit mechanisms.
 
 ### Key Differentiators
-- **Absolute Profit Rewards**: Unlike naive implementations using percentage returns, our reward function uses absolute profit to properly incentivize position sizing
+- **Log Return Rewards**: Uses logarithmic returns for time-additive, symmetric, and statistically robust reward signals that reduce outlier sensitivity
 - **BUY_MAX Action**: Price-adaptive position sizing - agent can go "all-in" based on available balance, no arbitrary limits
 - **Smart Data Caching**: Intelligent caching system prevents redundant API calls
 - **Production Quality**: Comprehensive monitoring, logging, and configuration management
@@ -397,16 +397,27 @@ The agent's action space is determined by `share_increments` configuration:
 
 ## Reward System Design
 
-### Critical Design Choice: Absolute vs Percentage Rewards
+### Critical Design Choice: Log Returns vs Simple Returns
 
-**Why Absolute Rewards Matter:**
+**Why Log Returns Are Superior:**
 
-Consider two scenarios with 10% profit:
-- Buy 1 share at $100, sell at $110 → Profit: $10
-- Buy 10 shares at $100, sell at $110 → Profit: $100
+Log returns offer several mathematical and practical advantages over simple percentage returns:
 
-With percentage rewards: Both get same reward (10)
-With absolute rewards: Second gets 10x reward (incentivizes proper position sizing)
+1. **Time-Additivity (Compound Growth)**
+   - Simple returns: 10% + 10% = 20% (incorrect for compounding)
+   - Log returns: log(1.1) + log(1.1) = log(1.21) ≈ 19.06% (correct!)
+
+2. **Symmetry of Gains/Losses**
+   - Simple: -50% loss requires +100% gain to break even (asymmetric)
+   - Log: -69.3 vs +69.3 (more balanced representation)
+
+3. **Outlier Compression**
+   - Reduces extreme reward spikes that can destabilize RL training
+   - 200% gain isn't treated as 4x more valuable than 50% gain
+
+4. **Better Statistical Properties**
+   - Closer to normal distribution → better neural network gradients
+   - Standard practice in quantitative finance
 
 ### Reward Function Implementation
 
@@ -420,25 +431,40 @@ transaction_penalty = -buy_transaction_cost_per_share * shares_bought  # Fixed c
 reward = buy_reward + transaction_penalty
 # Example: Buy 10 shares, reward = 0, cost = -$0.10, total = -$0.10
 
-# SELL Action (CRITICAL - Net Profit Percentage)
+# SELL Action (CRITICAL - Log Return)
 gross_profit = (sell_price - buy_price) * shares_held
 total_transaction_cost = (buy_cost_per_share + sell_cost_per_share) * shares_held
 net_profit = gross_profit - total_transaction_cost
 position_value = buy_price * shares_held
-reward = (net_profit / position_value) * 100
+simple_return = net_profit / position_value
+reward = log(1 + simple_return) * 100  # Log return scaled for readability
 
 # Example: Buy 10 shares at $100, sell at $110
 # Gross profit = $100, transaction costs = $0.20
 # Net profit = $99.80, position value = $1000
-# Reward = 9.98% (works across all stock prices!)
+# Simple return = 0.0998 (9.98%)
+# Reward = log(1.0998) * 100 ≈ 9.51 (log return)
 ```
+
+### Comparison: Simple vs Log Returns
+
+| Trade Return | Simple % | Log Reward | Difference |
+|--------------|----------|------------|------------|
+| +10% | +10.00 | +9.53 | -4.7% |
+| +50% | +50.00 | +40.55 | -18.9% |
+| +100% | +100.00 | +69.31 | -30.7% |
+| -50% | -50.00 | -69.31 | +38.6% |
+| -90% | -90.00 | -230.26 | +155.8% |
+
+**Key Insight:** Log returns compress large gains and amplify large losses, encouraging the agent to avoid catastrophic losses while still pursuing reasonable gains.
 
 ### Why This Matters
 
-The absolute reward ensures the agent learns:
+The log return reward ensures the agent learns:
 1. **When to trade** (market timing)
-2. **How much to trade** (position sizing)
-3. **Risk/reward tradeoffs** (larger positions = more profit but more risk)
+2. **How much to trade** (position sizing through trial and error)
+3. **Risk/reward tradeoffs** (losses hurt more, extreme gains compressed)
+4. **Stable training** (reduced variance, better convergence)
 
 ---
 

@@ -332,9 +332,17 @@ class TradingEnvironment:
                     total_transaction_cost = (buy_transaction_cost_per_share + sell_transaction_cost_per_share) * shares_to_sell
                     net_profit = realized_profit - total_transaction_cost
 
-                    # Reward based on net profit as percentage of position value sold
+                    # Reward based on log return of net profit
+                    # Log returns are time-additive, symmetric for gains/losses,
+                    # and reduce sensitivity to outlier trades
                     position_value_sold = avg_entry_sold * shares_to_sell
-                    reward = (net_profit / position_value_sold) * 100 if position_value_sold > 0 else 0
+                    if position_value_sold > 0:
+                        simple_return = net_profit / position_value_sold
+                        # Use log(1 + r) for proper compounding representation
+                        # Scale by 100 for readability (similar to percentage points)
+                        reward = np.log(1 + simple_return) * 100
+                    else:
+                        reward = 0
                 else:
                     # Failed to sell
                     reward = -1
