@@ -250,17 +250,22 @@ class ModelManager:
 
     def _generate_identifier(self, config: Dict[str, Any]) -> str:
         """Generate model identifier from configuration."""
+        # Use experiment_name as primary identifier to ensure unique per-strategy models
+        experiment_name = config.get('experiment_name', 'unnamed')
         ticker = config['ticker']
         start = config['start_date']
         end = config['end_date']
         episodes = config['training']['episodes']
-        window = config['data']['window_size']
-        share_increments = config['trading']['share_increments']
 
-        # Create compact representation of share_increments
-        increments_str = '_'.join(map(str, share_increments))
+        # Include project_folder if present (for organized directory structure)
+        project_folder = config.get('project_folder', None)
 
-        return f"{ticker}_{start}_{end}_ep{episodes}_ws{window}_si{increments_str}"
+        # Use experiment_name to guarantee uniqueness across strategies
+        base_identifier = f"{experiment_name}_{ticker}_{start}_{end}_ep{episodes}"
+
+        if project_folder:
+            return f"{project_folder}/{base_identifier}"
+        return base_identifier
 
     def _load_metadata(self, model_dir: str) -> Optional[Dict[str, Any]]:
         """Load metadata from model directory."""
