@@ -817,42 +817,62 @@ python monitor_training.py
 
 ## Results & Metrics
 
-### Project Scenario
+### Campaign: `my_project`
 
-This example demonstrates training DQN agents on SPY (S&P 500 ETF) with three different risk management strategies:
+A comprehensive evaluation of DQN trading agents on SPY (S&P 500 ETF) comparing risk management strategies and adaptive position sizing.
 
 **Configuration:**
 - **Ticker:** SPY
-- **Data Period:** 2005-2025 (21 years)
-- **Training Data:** 2006-2024 (~19 years)
-- **Starting Capital:** $10,000
+- **Data Period:** 2005-01-01 to 2025-12-31 (21 years)
+- **Training Data:** 2006-01-03 to 2024-12-27 (3,772 samples, ~19 years)
+- **Starting Capital:** $100,000
 - **Share Increments:** [10, 50, 100]
-- **Training Episodes:** 500 per strategy
+- **Training Episodes:** 500 per strategy (~2 hours per strategy)
 
-**Three Strategies Compared:**
-1. **SL/TP 10%** - Aggressive: 10% stop-loss and 10% take-profit guardrails (tight risk control)
-2. **SL/TP 20%** - Moderate: 20% stop-loss and 20% take-profit guardrails (balanced risk)
-3. **No Guardrails** - Flexible: No automatic position closing (agent decides when to exit)
+**Four Strategies Compared:**
+1. **SL/TP 10pct** - Aggressive: 10% stop-loss and take-profit (tight risk control)
+2. **SL/TP 20pct** - Moderate: 20% stop-loss and take-profit (balanced risk)
+3. **No Guardrails** - Full control: No auto-exits, includes BUY_MAX action (fixed position sizing)
+4. **No Guardrails (No BUY_MAX)** - Full control with adaptive position sizing
 
 ### Out-of-Sample Validation Results
 
-The trained models were evaluated on **5 randomly selected out-of-sample validation periods** spanning different market regimes:
+The trained models were evaluated on **5 randomly selected out-of-sample validation periods** spanning different market regimes. These periods were **never seen during training**:
 
-- **Period 1 (2005)** - Pre-financial crisis bull market
-- **Period 2 (2008)** - Global financial crisis
-- **Period 3 (2012)** - Post-crisis recovery
-- **Period 4 (2013)** - Bull market continuation
-- **Period 5 (2021)** - Post-COVID recovery
-
-These validation periods were **never seen during training** and represent diverse market conditions including bull markets, bear markets, high volatility, and recovery phases.
+- **Period 1 (2005-02-08 to 2005-12-30)** - Pre-financial crisis bull market
+- **Period 2 (2008-01-02 to 2008-12-31)** - Global financial crisis (extreme volatility)
+- **Period 3 (2012-01-03 to 2012-12-31)** - Post-crisis recovery
+- **Period 4 (2013-01-02 to 2013-12-31)** - Bull market continuation
+- **Period 5 (2021-01-04 to 2021-12-31)** - Post-COVID recovery
 
 ![Out-of-Sample Validation Comparison](docs/images/sample-validation-comparison.png)
 
-**Key Observations:**
-- **2008 Financial Crisis:** The 10% SL/TP strategy showed resilience with positive returns (+0.64%) by taking profits early, while the No Guardrails strategy suffered significant losses (-1.04%)
-- **2021 Bull Market:** No Guardrails strategy excelled with +2.87% return in strong uptrend conditions
-- **Sharpe Ratios:** All strategies showed consistent risk-adjusted returns across most validation periods, with Period 5 (2021) showing the strongest performance
-- **Trading Activity:** Guardrail strategies maintained consistent trading activity (~220-250 trades per period), while No Guardrails barely traded (0-7 trades), indicating a more selective approach
+**Key Validation Insights:**
+- **Period 2 (2008 Crisis):** All strategies struggled, with returns between -29.09% (SL/TP 10pct) and -31.51% (No Guardrails No BUY_MAX). Tight stop-losses provided better drawdown control.
+- **Period 4 & 5 (Bull Markets):** Strong performance across board, with returns of 14-26% (2013) and 7-21% (2021). No BUY_MAX strategy showed competitive risk-adjusted returns.
+- **Sharpe Ratios:** No Guardrails (No BUY_MAX) achieved best average Sharpe (1.00) across all periods, demonstrating consistent risk-adjusted performance.
+- **Trading Activity:** Guardrail strategies maintained consistent activity (835 trades for SL/TP 10pct, 461 for SL/TP 20pct across all periods), while No BUY_MAX strategy was more selective (461 trades total).
+
+### Test Set Performance
+
+Final evaluation on held-out test period (2024-12-30 to 2025-12-30, 251 samples) comparing against Buy & Hold baseline (18.08% return):
+
+![Test Metrics Comparison](docs/images/sample-test-metrics-comparison.png)
+
+**Test Results Summary:**
+
+| Strategy | Return | Sharpe | Max Drawdown | Win Rate | Trades |
+|----------|--------|--------|--------------|----------|--------|
+| **No Guardrails (No BUY_MAX)** | **11.15%** | **0.94** | -12.21% | **95.65%** | 69 |
+| SL/TP 10pct | 2.68% | 0.31 | -16.17% | 88.89% | 45 |
+| SL/TP 20pct | 2.24% | 0.30 | -9.00% | 59.55% | 89 |
+| Buy & Hold | 18.08% | N/A | N/A | N/A | N/A |
+
+**Key Test Insights:**
+- **Winner:** No Guardrails (No BUY_MAX) significantly outperformed other DQN strategies with 11.15% return and 0.94 Sharpe ratio
+- **vs Buy & Hold:** DQN strategies underperformed the passive baseline in this particular test period, highlighting the challenge of consistently beating buy-and-hold
+- **Risk-Adjusted:** No BUY_MAX achieved the best Sharpe ratio (0.94) among DQN strategies with highest win rate (95.65%)
+- **Position Sizing Impact:** Adaptive position sizing (No BUY_MAX) clearly outperformed fixed position sizing (No Guardrails) by 11.0%+, demonstrating the value of price-adaptive capital allocation
 
 ### Expected Performance
 
