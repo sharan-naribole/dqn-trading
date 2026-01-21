@@ -785,32 +785,50 @@ The trained models were evaluated on **5 randomly selected out-of-sample validat
 
 ![Out-of-Sample Validation Comparison](docs/images/sample-validation-comparison.png)
 
-**Key Validation Insights:**
-- **Period 2 (2008 Crisis):** All strategies struggled, with returns between -29.09% (SL/TP 10pct) and -31.51% (No Guardrails No BUY_MAX). Tight stop-losses provided better drawdown control.
-- **Period 4 & 5 (Bull Markets):** Strong performance across board, with returns of 14-26% (2013) and 7-21% (2021). No BUY_MAX strategy showed competitive risk-adjusted returns.
-- **Sharpe Ratios:** No Guardrails (No BUY_MAX) achieved best average Sharpe (1.00) across all periods, demonstrating consistent risk-adjusted performance.
-- **Trading Activity:** Guardrail strategies maintained consistent activity (835 trades for SL/TP 10pct, 461 for SL/TP 20pct across all periods), while No BUY_MAX strategy was more selective (461 trades total).
+*Out-of-sample validation metrics across 5 random periods, including Returns, Sharpe Ratio, Sortino Ratio, Win Rate, Number of Trades, and Position Size Distribution.*
+
+**Key Validation Insights (Average Across 5 Periods):**
+
+| Strategy | Avg Return | Avg Sharpe | Avg Sortino |
+|----------|------------|------------|-------------|
+| **No Guardrails (No BUY_MAX)** | **6.55%** | **1.02** | **1.48** |
+| SL/TP 10pct | 5.16% | 0.95 | 1.46 |
+| SL/TP 20pct | 4.48% | 0.95 | 1.35 |
+| No Guardrails | 2.37% | 1.01 | 1.34 |
+
+- **Best Risk-Adjusted:** No Guardrails (No BUY_MAX) achieved the best average Sharpe (1.02) and Sortino (1.48) ratios across all validation periods
+- **Consistency:** Strategies without BUY_MAX demonstrated more consistent performance with superior downside risk management (higher Sortino)
+- **Crisis Period (2008):** All strategies experienced significant drawdowns, highlighting the challenge of bear market navigation
+- **Bull Markets (2013, 2021):** Strategies showed strong performance with returns of 14-26%, demonstrating ability to capitalize on uptrends
 
 ### Test Set Performance
 
-Final evaluation on held-out test period (2024-12-30 to 2025-12-30, 251 samples) comparing against Buy & Hold baseline (18.08% return):
+Final evaluation on held-out test period (2024-12-30 to 2025-12-30, 251 samples) comparing against Buy & Hold baseline (17.99% return):
+
+![Test Portfolio Performance](docs/images/sample-test-portfolio-values.png)
+
+*Portfolio value over time showing DQN strategies vs Buy & Hold baseline. Note that Buy & Hold now correctly shows actual market volatility (buying max shares at start with remaining cash buffer) rather than linear interpolation.*
 
 ![Test Metrics Comparison](docs/images/sample-test-metrics-comparison.png)
 
+*Comprehensive test metrics including Returns, Sharpe Ratio, Sortino Ratio, Win Rate, Max Drawdown, and Position Size Distribution.*
+
 **Test Results Summary:**
 
-| Strategy | Return | Sharpe | Max Drawdown | Win Rate | Trades |
-|----------|--------|--------|--------------|----------|--------|
-| **No Guardrails (No BUY_MAX)** | **11.15%** | **0.94** | -12.21% | **95.65%** | 69 |
-| SL/TP 10pct | 2.68% | 0.31 | -16.17% | 88.89% | 45 |
-| SL/TP 20pct | 2.24% | 0.30 | -9.00% | 59.55% | 89 |
-| Buy & Hold | 18.08% | N/A | N/A | N/A | N/A |
+| Strategy | Return | Sharpe | Sortino | Max DD | Win Rate | Trades |
+|----------|--------|--------|---------|--------|----------|--------|
+| **SL/TP 10pct** | **15.16%** | **1.63** | **2.32** | **-6.80%** | **82.98%** | **141** |
+| No Guardrails (No BUY_MAX) | 11.42% | 1.11 | 1.43 | -9.99% | 94.29% | 70 |
+| No Guardrails | 6.70% | 0.56 | 0.60 | -14.31% | 69.20% | 224 |
+| SL/TP 20pct | 5.27% | 1.63 | 2.36 | -1.57% | 71.43% | 42 |
+| Buy & Hold | 17.99% | N/A | N/A | N/A | N/A | N/A |
 
 **Key Test Insights:**
-- **Winner:** No Guardrails (No BUY_MAX) significantly outperformed other DQN strategies with 11.15% return and 0.94 Sharpe ratio
-- **vs Buy & Hold:** DQN strategies underperformed the passive baseline in this particular test period, highlighting the challenge of consistently beating buy-and-hold
-- **Risk-Adjusted:** No BUY_MAX achieved the best Sharpe ratio (0.94) among DQN strategies with highest win rate (95.65%)
-- **Position Sizing Impact:** Adaptive position sizing (No BUY_MAX) clearly outperformed fixed position sizing (No Guardrails) by 11.0%+, demonstrating the value of price-adaptive capital allocation
+- **Winner:** SL/TP 10pct achieved the best DQN performance with 15.16% return, 1.63 Sharpe, and 2.32 Sortino ratio, coming close to Buy & Hold (17.99%)
+- **Risk Management:** Tight stop-loss strategies (10% and 20%) demonstrated superior risk-adjusted returns with Sharpe ratios of 1.63 and minimal drawdowns (-6.80% and -1.57%)
+- **Downside Protection:** Sortino ratios of 2.32-2.36 for SL/TP strategies indicate excellent downside risk management compared to Sharpe ratios
+- **Trading Efficiency:** No BUY_MAX strategy achieved 94.29% win rate with only 70 trades, demonstrating quality over quantity
+- **Guardrail Impact:** Strategies with stop-loss/take-profit guardrails significantly outperformed those without, validating the importance of risk management in volatile markets
 
 ### Expected Performance
 
