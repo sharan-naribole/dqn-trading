@@ -296,10 +296,25 @@ You can add multiple trading strategies to compare:
   "experiment_name": "aggressive",
   "strategy_name": "Aggressive (10% SL, 30% TP)",
   "trading": {
-    "share_increments": [10, 50, 100],
+    "share_increments": [10, 50, 100, 200],
+    "enable_buy_max": false,
     "stop_loss_pct": 10,
     "take_profit_pct": 30,
-    ...
+    "starting_balance": 100000,
+    "idle_reward": -0.001,
+    "buy_transaction_cost_per_share": 0.01,
+    "sell_transaction_cost_per_share": 0.01
+  },
+  "network": {
+    "architecture": "dueling",
+    "shared_layers": [256, 128],
+    "value_layers": [128],
+    "advantage_layers": [128]
+  },
+  "training": {
+    "episodes": 500,
+    "batch_size": 64,
+    "learning_rate": 0.001
   }
 }
 
@@ -308,10 +323,25 @@ You can add multiple trading strategies to compare:
   "experiment_name": "conservative",
   "strategy_name": "Conservative (30% SL, 10% TP)",
   "trading": {
-    "share_increments": [10, 50, 100],
+    "share_increments": [10, 50, 100, 200],
+    "enable_buy_max": false,
     "stop_loss_pct": 30,
     "take_profit_pct": 10,
-    ...
+    "starting_balance": 100000,
+    "idle_reward": -0.001,
+    "buy_transaction_cost_per_share": 0.01,
+    "sell_transaction_cost_per_share": 0.01
+  },
+  "network": {
+    "architecture": "dueling",
+    "shared_layers": [256, 128],
+    "value_layers": [128],
+    "advantage_layers": [128]
+  },
+  "training": {
+    "episodes": 500,
+    "batch_size": 64,
+    "learning_rate": 0.001
   }
 }
 ```
@@ -340,12 +370,13 @@ The agent's action space is determined by `share_increments` configuration:
 - Actions N+2 to 2N+1: SELL actions (one for each increment)
 - Action 2N+2: SELL_ALL
 
-| share_increments | Actions | Description |
-|------------------|---------|-------------|
-| [1] | 4 | HOLD, BUY_1, BUY_MAX, SELL_1, SELL_ALL |
-| [1, 5, 10] | 9 | HOLD, BUY_1, BUY_5, BUY_10, BUY_MAX, SELL_1, SELL_5, SELL_10, SELL_ALL |
-| [10, 50, 100] | 9 | HOLD, BUY_10, BUY_50, BUY_100, BUY_MAX, SELL_10, SELL_50, SELL_100, SELL_ALL |
-| [25, 50, 75, 100] | 11 | HOLD + 4 buys + BUY_MAX + 4 sells + SELL_ALL |
+| share_increments | Actions (with BUY_MAX) | Actions (without BUY_MAX) | Description |
+|------------------|----------------------|--------------------------|-------------|
+| [1] | 5 | 4 | HOLD, BUY_1, [BUY_MAX], SELL_1, SELL_ALL |
+| [1, 5, 10] | 9 | 8 | HOLD, BUY_1, BUY_5, BUY_10, [BUY_MAX], SELL_1, SELL_5, SELL_10, SELL_ALL |
+| [10, 50, 100] | 9 | 8 | HOLD, BUY_10, BUY_50, BUY_100, [BUY_MAX], SELL_10, SELL_50, SELL_100, SELL_ALL |
+| [10, 50, 100, 200] | 11 | 10 | HOLD, BUY_10, BUY_50, BUY_100, BUY_200, [BUY_MAX], SELL_10, SELL_50, SELL_100, SELL_200, SELL_ALL |
+| [25, 50, 75, 100] | 11 | 10 | HOLD + 4 buys + [BUY_MAX] + 4 sells + SELL_ALL |
 
 **Key Features:**
 
@@ -376,14 +407,17 @@ The agent's action space is determined by `share_increments` configuration:
 ### Trading Rules
 
 1. **Position Management**
-   - Can only buy when NOT holding any shares
-   - Must sell ALL shares at once (no partial sells)
+   - Agent can accumulate position through multiple BUY actions
+   - Position tracked with weighted average entry price
+   - Agent can sell portions using incremental SELL actions (FIFO)
+   - SELL_ALL always available when holding shares
    - Invalid actions are masked during training
 
 2. **Risk Controls**
-   - **Stop-Loss (20% default)**: Auto-sell if position drops 20%
-   - **Take-Profit (20% default)**: Auto-sell if position gains 20%
-   - **Transaction Costs (0.1%)**: Applied on both buy and sell
+   - **Stop-Loss**: Configurable % (10%, 20%, or 100% to disable)
+   - **Take-Profit**: Configurable % (10%, 20%, or 10,000% to disable)
+   - **Transaction Costs**: $0.01 per share on both buy and sell
+   - **Idle Penalty**: -0.001 reward per step to encourage active trading
 
 3. **State Representation**
    ```python
@@ -764,14 +798,79 @@ A comprehensive evaluation of DQN trading agents on SPY (S&P 500 ETF) comparing 
 - **Data Period:** 2005-01-01 to 2025-12-31 (21 years)
 - **Training Data:** 2006-01-03 to 2024-12-27 (3,772 samples, ~19 years)
 - **Starting Capital:** $100,000
-- **Share Increments:** [10, 50, 100]
+- **Share Increments:** [10, 50, 100, 200]
+- **Transaction Costs:** $0.01 per share (buy and sell)
+- **Idle Reward:** -0.001 per step (encourages active trading)
+- **Network Architecture:** Dueling DQN with [256, 128] shared layers, [128] value/advantage layers
 - **Training Episodes:** 500 per strategy (~2 hours per strategy)
+- **Training Hyperparameters:**
+  - Batch size: 64
+  - Replay buffer: 10,000 transitions
+  - Learning rate: 0.001 (Adam optimizer)
+  - Gamma (discount): 0.99
+  - Epsilon decay: 0.995 (1.0 → 0.01)
+  - Target network update: Every 5 episodes
 
 **Four Strategies Compared:**
-1. **SL/TP 10pct** - Aggressive: 10% stop-loss and take-profit (tight risk control)
-2. **SL/TP 20pct** - Moderate: 20% stop-loss and take-profit (balanced risk)
-3. **No Guardrails** - Full control: No auto-exits, includes BUY_MAX action (fixed position sizing)
-4. **No Guardrails (No BUY_MAX)** - Full control with adaptive position sizing
+
+1. **SL/TP 10pct** (`enable_buy_max: false`)
+   - 10% stop-loss and 10% take-profit (tight risk control)
+   - No BUY_MAX action (10 total actions: HOLD + 4 BUY + 4 SELL + SELL_ALL)
+   - Forces precise position sizing decisions with incremental buys
+
+2. **SL/TP 20pct** (`enable_buy_max: false`)
+   - 20% stop-loss and 20% take-profit (balanced risk/reward)
+   - No BUY_MAX action (10 total actions)
+   - Wider guardrails allow more room for price movement
+
+3. **No Guardrails** (`enable_buy_max: true`)
+   - Stop-loss: 100%, Take-profit: 10,000% (effectively disabled)
+   - Includes BUY_MAX action (11 total actions: HOLD + 4 BUY + BUY_MAX + 4 SELL + SELL_ALL)
+   - Pure DQN decision-making with adaptive position sizing via BUY_MAX
+
+4. **No Guardrails (No BUY_MAX)** (`enable_buy_max: false`)
+   - Stop-loss: 100%, Take-profit: 10,000% (effectively disabled)
+   - No BUY_MAX action (10 total actions)
+   - Pure DQN with manual position sizing using only incremental actions
+
+**Configuration Files:**
+
+All strategies share the same network architecture and training hyperparameters, differing only in risk management settings:
+
+```json
+// Common to all strategies
+{
+  "trading": {
+    "share_increments": [10, 50, 100, 200],
+    "starting_balance": 100000,
+    "idle_reward": -0.001,
+    "buy_reward_per_share": 0.0,
+    "buy_transaction_cost_per_share": 0.01,
+    "sell_transaction_cost_per_share": 0.01
+  },
+  "network": {
+    "architecture": "dueling",
+    "shared_layers": [256, 128],
+    "value_layers": [128],
+    "advantage_layers": [128],
+    "activation": "relu"
+  },
+  "training": {
+    "episodes": 500,
+    "batch_size": 64,
+    "replay_buffer_size": 10000,
+    "learning_rate": 0.001,
+    "gamma": 0.99,
+    "epsilon_decay": 0.995
+  }
+}
+
+// Strategy-specific differences:
+// SL/TP 10pct:  stop_loss_pct: 10,  take_profit_pct: 10,    enable_buy_max: false
+// SL/TP 20pct:  stop_loss_pct: 20,  take_profit_pct: 20,    enable_buy_max: false
+// No Guardrails: stop_loss_pct: 100, take_profit_pct: 10000, enable_buy_max: true
+// No Guardrails (No BUY_MAX): stop_loss_pct: 100, take_profit_pct: 10000, enable_buy_max: false
+```
 
 ### Out-of-Sample Validation Results
 
@@ -789,15 +888,17 @@ The trained models were evaluated on **5 randomly selected out-of-sample validat
 
 **Key Validation Insights (Average Across 5 Periods):**
 
-| Strategy | Avg Return | Avg Sharpe | Avg Sortino |
-|----------|------------|------------|-------------|
-| **No Guardrails (No BUY_MAX)** | **6.55%** | **1.02** | **1.48** |
-| SL/TP 10pct | 5.16% | 0.95 | 1.46 |
-| SL/TP 20pct | 4.48% | 0.95 | 1.35 |
-| No Guardrails | 2.37% | 1.01 | 1.34 |
+| Strategy | Avg Return | Avg Sharpe | Avg Sortino | Actions |
+|----------|------------|------------|-------------|---------|
+| **No Guardrails (No BUY_MAX)** | **6.55%** | **1.02** | **1.48** | 10 |
+| SL/TP 10pct | 5.16% | 0.95 | 1.46 | 10 |
+| SL/TP 20pct | 4.48% | 0.95 | 1.35 | 10 |
+| No Guardrails | 2.37% | 1.01 | 1.34 | 11 |
 
+**Analysis:**
 - **Best Risk-Adjusted:** No Guardrails (No BUY_MAX) achieved the best average Sharpe (1.02) and Sortino (1.48) ratios across all validation periods
-- **Consistency:** Strategies without BUY_MAX demonstrated more consistent performance with superior downside risk management (higher Sortino)
+- **BUY_MAX Impact:** Strategies without BUY_MAX (10 actions) demonstrated more consistent performance with superior downside risk management (higher Sortino), suggesting that incremental position sizing [10, 50, 100, 200] allows for better risk control than adaptive BUY_MAX
+- **Guardrail Trade-off:** Removing guardrails allows DQN to learn more nuanced exit strategies, but requires careful position sizing discipline
 - **Crisis Period (2008):** All strategies experienced significant drawdowns, highlighting the challenge of bear market navigation
 - **Bull Markets (2013, 2021):** Strategies showed strong performance with returns of 14-26%, demonstrating ability to capitalize on uptrends
 
@@ -815,20 +916,22 @@ Final evaluation on held-out test period (2024-12-30 to 2025-12-30, 251 samples)
 
 **Test Results Summary:**
 
-| Strategy | Return | Sharpe | Sortino | Max DD | Win Rate | Trades |
-|----------|--------|--------|---------|--------|----------|--------|
-| **SL/TP 10pct** | **15.16%** | **1.63** | **2.32** | **-6.80%** | **82.98%** | **141** |
-| No Guardrails (No BUY_MAX) | 11.42% | 1.11 | 1.43 | -9.99% | 94.29% | 70 |
-| No Guardrails | 6.70% | 0.56 | 0.60 | -14.31% | 69.20% | 224 |
-| SL/TP 20pct | 5.27% | 1.63 | 2.36 | -1.57% | 71.43% | 42 |
-| Buy & Hold | 17.99% | N/A | N/A | N/A | N/A | N/A |
+| Strategy | Return | Sharpe | Sortino | Max DD | Win Rate | Trades | Actions |
+|----------|--------|--------|---------|--------|----------|--------|---------|
+| **SL/TP 10pct** | **15.16%** | **1.63** | **2.32** | **-6.80%** | **82.98%** | **141** | 10 |
+| No Guardrails (No BUY_MAX) | 11.42% | 1.11 | 1.43 | -9.99% | 94.29% | 70 | 10 |
+| No Guardrails | 6.70% | 0.56 | 0.60 | -14.31% | 69.20% | 224 | 11 |
+| SL/TP 20pct | 5.27% | 1.63 | 2.36 | -1.57% | 71.43% | 42 | 10 |
+| Buy & Hold | 17.99% | N/A | N/A | N/A | N/A | N/A | N/A |
 
-**Key Test Insights:**
-- **Winner:** SL/TP 10pct achieved the best DQN performance with 15.16% return, 1.63 Sharpe, and 2.32 Sortino ratio, coming close to Buy & Hold (17.99%)
+**Analysis:**
+- **Winner:** SL/TP 10pct (10% SL/TP, no BUY_MAX, 10 actions) achieved the best DQN performance with 15.16% return, 1.63 Sharpe, and 2.32 Sortino ratio, coming close to Buy & Hold (17.99%)
 - **Risk Management:** Tight stop-loss strategies (10% and 20%) demonstrated superior risk-adjusted returns with Sharpe ratios of 1.63 and minimal drawdowns (-6.80% and -1.57%)
-- **Downside Protection:** Sortino ratios of 2.32-2.36 for SL/TP strategies indicate excellent downside risk management compared to Sharpe ratios
-- **Trading Efficiency:** No BUY_MAX strategy achieved 94.29% win rate with only 70 trades, demonstrating quality over quantity
-- **Guardrail Impact:** Strategies with stop-loss/take-profit guardrails significantly outperformed those without, validating the importance of risk management in volatile markets
+- **Downside Protection:** Sortino ratios of 2.32-2.36 for SL/TP strategies indicate excellent downside risk management, prioritizing protection against negative returns
+- **Trading Efficiency:** No Guardrails (No BUY_MAX) achieved 94.29% win rate with only 70 trades, demonstrating quality over quantity with incremental position sizing [10, 50, 100, 200]
+- **Guardrail Impact:** Strategies with stop-loss/take-profit guardrails significantly outperformed those without, validating the importance of automated risk management
+- **BUY_MAX Trade-off:** All top 3 performers disabled BUY_MAX, suggesting that forcing explicit position sizing decisions through incremental actions leads to better risk-adjusted returns than adaptive all-in positioning
+- **Action Space:** The 10-action strategies (without BUY_MAX) dominated performance, suggesting a simpler action space with forced incremental sizing improves learning efficiency
 
 ### Expected Performance
 

@@ -5,7 +5,7 @@
   "description": "Pure DQN decision-making without stop-loss or take-profit limits",
 
   "trading": {
-    "share_increments": [10, 50, 100],
+    "share_increments": [10, 50, 100, 200],
     "enable_buy_max": true,
     "starting_balance": 100000,
     "idle_reward": -0.001,
