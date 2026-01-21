@@ -1,4 +1,4 @@
-# DQN Trading System - Production-Grade Deep Reinforcement Learning for Stock Trading
+# DQN Trading System - Deep Reinforcement Learning for Stock Trading
 
 A professional implementation of Deep Q-Network (DQN) for stock trading with Double DQN, Dueling architecture, intelligent position sizing, and comprehensive risk management.
 
@@ -34,7 +34,7 @@ This system trains an AI agent to make stock trading decisions (Buy/Hold/Sell) w
 - **Log Return Rewards**: Uses logarithmic returns for time-additive, symmetric, and statistically robust reward signals that reduce outlier sensitivity
 - **BUY_MAX Action**: Price-adaptive position sizing - agent can go "all-in" based on available balance, no arbitrary limits
 - **Smart Data Caching**: Intelligent caching system prevents redundant API calls
-- **Production Quality**: Comprehensive monitoring, logging, and configuration management
+- **Comprehensive Monitoring**: Real-time logging and configuration management
 
 ### Core Capabilities
 | Feature | Description |
@@ -268,7 +268,7 @@ mkdir config/my_project
 ```json
 # config/my_project/data_config.json
 {
-  "ticker": "AAPL",
+  "ticker": "BTC-USD",
   "start_date": "2020-01-01",
   "end_date": "2024-12-31",
   "data": {
@@ -615,68 +615,6 @@ Key Properties:
 - Randomly selected months
 - Non-overlapping (no data reuse)
 - Ensures temporal robustness
-
----
-
-## Configuration Guide
-
-### Configuration Methods
-
-```python
-# Method 1: Predefined
-CONFIG_MODE = 'dry_run'   # Quick test (1 episode)
-CONFIG_MODE = 'default'   # Full training (100 episodes)
-
-# Method 2: Custom with path
-CONFIG_MODE = 'custom'
-CUSTOM_CONFIG_PATH = 'config/my_config.json'
-
-# Method 3: Direct path
-CONFIG_MODE = 'config/aapl_config.json'
-```
-
-### Configuration Features
-
-The configuration system supports extensive customization of:
-- Trading mechanics (position sizing, rewards, risk limits)
-- Neural network architecture (layers, activation, regularization)
-- Training hyperparameters (episodes, learning rate, exploration)
-- Data processing (indicators, normalization windows)
-- Validation/test splits
-
-**Quick Example:**
-```json
-{
-  "ticker": "SPY",
-  "start_date": "2016-01-01",
-  "end_date": "2025-12-31",
-  "trading": {
-    "share_increments": [1, 5, 10],
-    "starting_balance": 100000,
-    "idle_reward": -0.001,
-    "buy_reward_per_share": 0.0,
-    "buy_transaction_cost_per_share": 0.01,
-    "sell_transaction_cost_per_share": 0.01
-  },
-  "training": {
-    "episodes": 100,
-    "target_update_freq": 1
-  }
-}
-```
-
-### Creating Custom Configurations
-
-```bash
-# Interactive configuration creator
-python create_config.py
-
-# Choose:
-# 1. Detailed - Configure all parameters
-# 2. Quick - Just ticker and episodes
-
-# Creates: config/ticker_timestamp_config.json
-```
 
 ---
 
