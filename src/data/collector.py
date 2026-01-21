@@ -132,7 +132,13 @@ class DataCollector:
                     file_end = pd.to_datetime(file_end_str, format='%Y%m%d')
 
                     # Check if this file contains our requested range
-                    if file_start <= start_date and file_end >= end_date:
+                    # Be lenient: allow cache if it covers most of the range
+                    # (start can be slightly later if that's when trading began,
+                    #  end can be slightly earlier if future dates don't exist yet)
+                    start_ok = file_start <= start_date or (file_start - start_date).days <= 180  # 6 months tolerance
+                    end_ok = file_end >= end_date or (end_date - file_end).days <= 7  # 1 week tolerance for future dates
+
+                    if start_ok and end_ok:
                         # Verify file actually has data in this range
                         test_df = pd.read_csv(filepath, index_col='Date', parse_dates=True, nrows=5)
                         if not test_df.empty:
